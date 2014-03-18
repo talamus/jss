@@ -1,9 +1,12 @@
+"use strict";
 /*
- * JSS v0.5 - JavaScript Stylesheets
+ * JSS v0.5.1 - JavaScript Stylesheets
  * https://github.com/Box9/jss
  *
  * Copyright (c) 2011, David Tang
  * MIT Licensed (http://www.opensource.org/licenses/mit-license.php)
+ *
+ * Partial IE8 support added by Tero Niemi
  */
 var jss = (function() {
     var adjSelAttrRgx = /((?:\.|#)[^\.\s#]+)((?:\.|#)[^\.\s#]+)/g;
@@ -98,8 +101,8 @@ var jss = (function() {
     function swapAdjSelAttr(selector) {
         var swap = '';
         var lastIndex = 0;
-            
-        while ((match = adjSelAttrRgx.exec(selector)) != null) {
+
+        for (var match; (match = adjSelAttrRgx.exec(selector)) != null;) {
             if (match[0] === '')
                 break;
             swap += selector.substring(lastIndex, match.index);
@@ -108,21 +111,40 @@ var jss = (function() {
             lastIndex = match.index + match[0].length;
         }
         swap += selector.substr(lastIndex);
-        
+
         return swap;
     };
 
     function setStyleProperties(rule, properties) {
+
+        function removeProperty(key) {
+            if (rule.style.removeProperty) {
+                rule.style.removeProperty(unCamelCase(key));
+            } else {
+                rule.style.removeAttribute(key);
+            }
+        }
+
+        function setProperty(key, value, flags) {
+            if (rule.style.setProperty) {
+                if (flags) rule.style.setProperty(unCamelCase(key), value, flags);
+                else       rule.style.setProperty(unCamelCase(key), value);
+            } else {
+                if (flags) rule.style.setAttribute(key, value, flags);
+                else       rule.style.setAttribute(key, value);
+            }
+        }
+
         for (var key in properties) {
             var value = properties[key];
             var importantIndex = value.indexOf(' !important');
 
             // Modern browsers seem to handle overrides fine, but IE9 doesn't
-            rule.style.removeProperty(key); 
+            removeProperty(key);
             if (importantIndex > 0) {
-                rule.style.setProperty(key, value.substr(0, importantIndex), 'important');
+                setProperty(key, value.substr(0, importantIndex), 'important');
             } else {
-                rule.style.setProperty(key, value);
+                setProperty(key, value);
             }
         }
     }
@@ -131,14 +153,6 @@ var jss = (function() {
         return str.replace(/-([a-z])/g, function (match, submatch) {
             return submatch.toUpperCase();
         });
-    }
-
-    function transformCamelCasedPropertyNames(oldProps) {
-        var newProps = {};
-        for (var key in oldProps) {
-            newProps[unCamelCase(key)] = oldProps[key];
-        }
-        return newProps;
     }
 
     function unCamelCase(str) {
@@ -181,7 +195,6 @@ var jss = (function() {
             if (!this.defaultSheet) {
                 this.defaultSheet = this._createSheet();
             }
-            properties = transformCamelCasedPropertyNames(properties);
             var rules = getRules(this.defaultSheet, selector);
             if (!rules.length) {
                 rules = [addRule(this.defaultSheet, selector)];
